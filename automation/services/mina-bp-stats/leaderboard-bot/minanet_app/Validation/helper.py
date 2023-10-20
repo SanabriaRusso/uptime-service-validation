@@ -1,3 +1,5 @@
+import networkx as nx
+
 def filter_state_hash_percentage(df, p=0.34):
     state_hash_list = df['state_hash'].value_counts().sort_values(ascending=False).index.to_list()
     # get 34% number of blk in given batch
