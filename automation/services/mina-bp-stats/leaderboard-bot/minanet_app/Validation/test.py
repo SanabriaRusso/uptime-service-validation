@@ -5,12 +5,16 @@ import pandas as pd
 
 class TestingGraphMethods(unittest.TestCase):
     def test_filter_state_hash_single(self):
-        master_state_hash = pd.DataFrame([['state_hash_1', 'block_producer_key_1']], columns=['state_hash', 'block_producer_key'])
+        master_state_hash = pd.DataFrame([['state_hash_1', 'block_producer_key_1']], 
+                                         columns=['state_hash', 'block_producer_key'])
         output = filter_state_hash_percentage(master_state_hash)
         self.assertEqual(output, ['state_hash_1'])
 
     def test_filter_state_hash_multi(self):
-        master_state_hash = pd.DataFrame([['state_hash_1', 'block_producer_key_1'], ['state_hash_1', 'block_producer_key_2'], ['state_hash_2', 'block_producer_key_3']], columns=['state_hash', 'block_producer_key'])
+        master_state_hash = pd.DataFrame([['state_hash_1', 'block_producer_key_1'], 
+                                          ['state_hash_1', 'block_producer_key_2'], 
+                                          ['state_hash_2', 'block_producer_key_3']], 
+                                          columns=['state_hash', 'block_producer_key'])
         output = filter_state_hash_percentage(master_state_hash)
         self.assertEqual(output, ['state_hash_1'])
 
@@ -39,7 +43,11 @@ class TestingGraphMethods(unittest.TestCase):
 
     def test_create_graph_count_number_of_nodes_and_edges_nested(self):
         # current batch that was downloaded
-        batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
+        batch_df = pd.DataFrame([
+            ['state_hash_1', 'parent_state_hash_1'], 
+            ['state_hash_2', 'state_hash_1'], 
+            ['state_hash_3', 'state_hash_2']], 
+            columns=['state_hash', 'parent_state_hash'])
         # previous_state_hashes with weight
         p_selected_node_df = pd.DataFrame([['parent_state_hash_1'] ,['parent_state_hash_2']], columns=['state_hash'])
         # filtered_state_hashes  
@@ -58,8 +66,13 @@ class TestingGraphMethods(unittest.TestCase):
 # --p_selected_node_df: these are all the (short-listed) state-hashes from the previous batch (as well as their weights).
 # --c_selected_node: these are the hashes from the current batch above 34% threshold
     def test_apply_weights_sum_weights_empty_parents_and_empty_selected_node(self):
-        batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
-        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123] ,['parent_state_hash_2', 345]], columns=['state_hash', 'weight'])
+        batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], 
+                                 ['state_hash_2', 'state_hash_1'], 
+                                 ['state_hash_3', 'state_hash_2']], 
+                                 columns=['state_hash', 'parent_state_hash'])
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123],
+                                           ['parent_state_hash_2', 345]], 
+                                           columns=['state_hash', 'weight'])
         c_selected_node =  ['state_hash_1', 'state_hash_2']
         p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         batch_graph = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
@@ -72,8 +85,13 @@ class TestingGraphMethods(unittest.TestCase):
             self.assertEqual(weighted_graph.nodes[node]['weight'], 9999)
 
     def test_apply_weights_sum_weights_nested(self):
-        batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
-        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123] ,['parent_state_hash_2', 345]], columns=['state_hash', 'weight'])
+        batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], 
+                                 ['state_hash_2', 'state_hash_1'], 
+                                 ['state_hash_3', 'state_hash_2']], 
+                                 columns=['state_hash', 'parent_state_hash'])
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123], 
+                                           ['parent_state_hash_2', 345]], 
+                                           columns=['state_hash', 'weight'])
         c_selected_node =  ['state_hash_1', 'state_hash_2']
         p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         batch_graph = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
@@ -100,8 +118,13 @@ class TestingGraphMethods(unittest.TestCase):
 # --batch_statehash: presumably all the state-hashes from the current batch and is unused (could be removed)
 # --g_pos: this is always None and is unused (could be removed)
     def test_bfs_easy(self):
-        batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
-        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123] ,['parent_state_hash_2', 345]], columns=['state_hash', 'weight'])
+        batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'],
+                                ['state_hash_2', 'state_hash_1'], 
+                                ['state_hash_3', 'state_hash_2']], 
+                                columns=['state_hash', 'parent_state_hash'])
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123],
+                                           ['parent_state_hash_2', 345]], 
+                                           columns=['state_hash', 'weight'])
         # empty short-list
         c_selected_node =  ['state_hash_1', 'state_hash_2']
         p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
@@ -130,7 +153,9 @@ class TestingGraphMethods(unittest.TestCase):
             ['state_hash_26', 'state_hash_25']
             ], 
             columns=['state_hash', 'parent_state_hash'])
-        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 1], ['parent_state_hash_2', 1]], columns=['state_hash', 'weight'])
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 1], 
+                                           ['parent_state_hash_2', 1]], 
+                                           columns=['state_hash', 'weight'])
         c_selected_node =  ['state_hash_11', 'state_hash_21']
         p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         batch_graph = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
