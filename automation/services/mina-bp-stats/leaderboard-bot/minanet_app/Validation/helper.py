@@ -1,7 +1,7 @@
 import networkx as nx
 import pandas as pd
 
-#I'm duplicating the code here at the moment, until we decide what direction to take vis-a-vis refactoring/optimisation
+#I'm duplicating the code here at the moment, until we decide what direction to take.
 #I've explicitly set some of the base variables.
 
 def filter_state_hash_percentage(df, p=0.34):

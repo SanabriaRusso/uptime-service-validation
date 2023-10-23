@@ -18,9 +18,9 @@ class TestingGraphMethods(unittest.TestCase):
 # It also adds edges between any child and parent hash.
 # The arguments are:
 # --batch_df: state-hashes of current batch.
-# --p_selected_node_df: these are all the state-hashes from the previous batch (as well as their weights).
+# --p_selected_node_df: these are all the (short-listed) state-hashes from the previous batch (as well as their weights).
 # --c_selected_node: these are the hashes from the current batch above 34% threshold
-# --p_map: this lists the parent-child relationships between the two batches.
+# --p_map: this lists the parent-child relationships in the previous batch.
 
     def test_create_graph_count_number_of_nodes_and_edges(self):
         # current batch that was downloaded
@@ -52,10 +52,10 @@ class TestingGraphMethods(unittest.TestCase):
         # total number of edges is the parent-child relations in p_map, but plus also the parent-child relations ships in the batch (in this case 2).      
         self.assertEqual(len(output.edges), len(p_map) + 2)
 
-# The apply_weights fucntion sets the weights to 0 for any node aboce the 34% threshold and if a parent_hash to the weight computed form last time.
+# The apply_weights function sets the weights to 0 for any node aboce the 34% threshold and if a parent_hash to the weight computed form last time.
 # The arguments are:
 # --batch_df: state-hashes of current batch.
-# --p_selected_node_df: these are all the state-hashes from the previous batch (as well as their weights).
+# --p_selected_node_df: these are all the (short-listed) state-hashes from the previous batch (as well as their weights).
 # --c_selected_node: these are the hashes from the current batch above 34% threshold
     def test_apply_weights_sum_weights_empty_parents_and_empty_selected_node(self):
         batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
@@ -91,7 +91,7 @@ class TestingGraphMethods(unittest.TestCase):
                 self.assertEqual(weighted_graph.nodes[node]['weight'], 123)          
     
 # The bfs is what computes the weight for nodes that aren't previous hashes or above the 34% threshold (which automatically have weight 0).
-# The bfs output actually includes the parent-hashes as well.
+# The bfs output actually includes the parent-hashes, as well, and all those hashes from the current batch with computed weight <= 2.
 # The arguments are:
 # --graph: weighted graph computed from create_graph and apply_weights function
 # --queue_list: these are the parent_hashes and the theshold hashes from the current batch.
