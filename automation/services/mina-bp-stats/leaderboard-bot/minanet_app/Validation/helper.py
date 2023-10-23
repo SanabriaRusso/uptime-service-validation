@@ -1,4 +1,8 @@
 import networkx as nx
+import pandas as pd
+
+#I'm duplicating the code here at the moment, until we decide what direction to take vis-a-vis refactoring/optimisation
+#I've explicitly set some of the base variables.
 
 def filter_state_hash_percentage(df, p=0.34):
     state_hash_list = df['state_hash'].value_counts().sort_values(ascending=False).index.to_list()
@@ -41,3 +45,50 @@ def create_graph(batch_df, p_selected_node_df, c_selected_node, p_map):
     batch_graph.add_edges_from(p_map)
 
     return batch_graph
+
+def apply_weights(batch_graph, c_selected_node, p_selected_node):
+    for node in list(batch_graph.nodes()):
+        if node in c_selected_node:
+            batch_graph.nodes[node]['weight'] = 0
+        elif node in p_selected_node['state_hash'].values:
+            batch_graph.nodes[node]['weight'] = p_selected_node[p_selected_node['state_hash'] == node]['weight'].values[
+                0]
+        else:
+            batch_graph.nodes[node]['weight'] = 9999
+
+    g_pos = None  # plot_graph(batch_graph, None, '1. first apply')
+    return batch_graph, g_pos
+
+def bfs(graph, queue_list, node, batch_statehash, g_pos):
+    visited = list()
+    visited.append(node)
+    cnt = 2
+    while queue_list:
+        m = queue_list.pop(0)
+        for neighbour in list(graph.neighbors(m)):
+            if neighbour not in visited:
+                graph.nodes[neighbour]['weight'] = get_minimum_weight(graph, neighbour)
+                visited.append(neighbour)
+                # if not neighbour in visited:
+                queue_list.append(neighbour)
+        # plot_graph(graph, g_pos, str(cnt)+'.'+m)
+        cnt += 1
+    shortlisted_state = []
+    hash_weights = []
+    for node in list(graph.nodes()):
+        if graph.nodes[node]['weight'] <= 2:
+            # if node in batch_statehash:
+            shortlisted_state.append(node)
+            hash_weights.append(graph.nodes[node]['weight'])
+
+    shortlisted_state_hash_df = pd.DataFrame()
+    shortlisted_state_hash_df['state_hash'] = shortlisted_state
+    shortlisted_state_hash_df['weight'] = hash_weights
+    return shortlisted_state_hash_df
+
+def get_minimum_weight(graph, child_node):
+    child_node_weight = graph.nodes[child_node]['weight']
+    for parent in list(graph.predecessors(child_node)):
+        lower = min(graph.nodes[parent]['weight'] + 1, child_node_weight)
+        child_node_weight = lower
+    return child_node_weight
