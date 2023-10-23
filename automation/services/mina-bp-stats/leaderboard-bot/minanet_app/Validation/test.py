@@ -15,7 +15,7 @@ class TestingGraphMethods(unittest.TestCase):
         self.assertEqual(output, ['state_hash_1'])
 
 # The create_graph function creates a graph and adds all the state_hashes that appear in the batch as nodes, as well as the hashes from the previous batch.
-# It also adds edges between any child and parent hash.
+# It also adds edges between any child and parent hash (this is even for parent-child relationship between batches)
 # The arguments are:
 # --batch_df: state-hashes of current batch.
 # --p_selected_node_df: these are all the (short-listed) state-hashes from the previous batch (as well as their weights).
@@ -41,45 +41,44 @@ class TestingGraphMethods(unittest.TestCase):
         # current batch that was downloaded
         batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
         # previous_state_hashes with weight
-        p_selected_node_df = pd.DataFrame(['parent_state_hash_1'], columns=['state_hash'])
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1'] ,['parent_state_hash_2']], columns=['state_hash'])
         # filtered_state_hashes  
         c_selected_node =  ['state_hash_1', 'state_hash_2']
         # relations between parents and children, i.e. those previous stte hashes that are parents in this batch.
-        p_map = [['parent_state_hash_1', 'state_hash_1']]
+        p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         output = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
         # total number of nodes is the same
         self.assertEqual(len(output.nodes), len(batch_df) + len(p_selected_node_df))
-        # total number of edges is the parent-child relations in p_map, but plus also the parent-child relations ships in the batch (in this case 2).      
-        self.assertEqual(len(output.edges), len(p_map) + 2)
+        # total number of edges is the parent-child relations in p_map, but plus also the parent-child relationships in the batch (i.e. 2) and between the two batches (i.e. 1).      
+        self.assertEqual(len(output.edges), len(p_map) + 3)
 
-# The apply_weights function sets the weights to 0 for any node aboce the 34% threshold and if a parent_hash to the weight computed form last time.
+# The apply_weights function sets the weights to 0 for any node above the 34% threshold and if a parent_hash to the weight computed form last time.
 # The arguments are:
 # --batch_df: state-hashes of current batch.
 # --p_selected_node_df: these are all the (short-listed) state-hashes from the previous batch (as well as their weights).
 # --c_selected_node: these are the hashes from the current batch above 34% threshold
     def test_apply_weights_sum_weights_empty_parents_and_empty_selected_node(self):
         batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
-        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123]], columns=['state_hash', 'weight'])
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123] ,['parent_state_hash_2', 345]], columns=['state_hash', 'weight'])
         c_selected_node =  ['state_hash_1', 'state_hash_2']
-        p_map = [['parent_state_hash_1', 'state_hash_1']]
+        p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         batch_graph = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
         # pass in empty short-lists and parent nodes to the weight function and ensure every node has infinite weighting.
         c_selected_node_empty = []
         p_selected_node_df_empty = pd.DataFrame([], columns=['state_hash', 'weight'])
         weighted_graph, g_nod = apply_weights(batch_graph, c_selected_node_empty, p_selected_node_df_empty)
-        # total weight of edges
+        self.assertEqual(len(list(weighted_graph.nodes)), 5)
         for node in list(weighted_graph.nodes):
             self.assertEqual(weighted_graph.nodes[node]['weight'], 9999)
 
     def test_apply_weights_sum_weights_nested(self):
         batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
-        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123]], columns=['state_hash', 'weight'])
-        # empty short-list
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123] ,['parent_state_hash_2', 345]], columns=['state_hash', 'weight'])
         c_selected_node =  ['state_hash_1', 'state_hash_2']
-        p_map = [['parent_state_hash_1', 'state_hash_1']]
+        p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         batch_graph = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
         weighted_graph, g_nod = apply_weights(batch_graph, c_selected_node, p_selected_node_df)
-        # total weight of edges
+        self.assertEqual(len(list(weighted_graph.nodes)), 5)
         for node in list(weighted_graph.nodes):
             if node == 'state_hash_1':
                 self.assertEqual(weighted_graph.nodes[node]['weight'], 0)
@@ -88,7 +87,9 @@ class TestingGraphMethods(unittest.TestCase):
             if node == 'state_hash_3':
                 self.assertEqual(weighted_graph.nodes[node]['weight'], 9999)
             if node == 'parent_state_hash_1':
-                self.assertEqual(weighted_graph.nodes[node]['weight'], 123)          
+                self.assertEqual(weighted_graph.nodes[node]['weight'], 123)
+            if node == 'parent_state_hash_2':
+                self.assertEqual(weighted_graph.nodes[node]['weight'], 345)            
     
 # The bfs is what computes the weight for nodes that aren't previous hashes or above the 34% threshold (which automatically have weight 0).
 # The bfs output actually includes the parent-hashes, as well, and all those hashes from the current batch with computed weight <= 2.
@@ -100,10 +101,10 @@ class TestingGraphMethods(unittest.TestCase):
 # --g_pos: this is always None and is unused (could be removed)
     def test_bfs_easy(self):
         batch_df = pd.DataFrame([['state_hash_1', 'parent_state_hash_1'], ['state_hash_2', 'state_hash_1'], ['state_hash_3', 'state_hash_2']], columns=['state_hash', 'parent_state_hash'])
-        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123]], columns=['state_hash', 'weight'])
+        p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 123] ,['parent_state_hash_2', 345]], columns=['state_hash', 'weight'])
         # empty short-list
         c_selected_node =  ['state_hash_1', 'state_hash_2']
-        p_map = [['parent_state_hash_1', 'state_hash_1']]
+        p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         batch_graph = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
         weighted_graph, g_nod = apply_weights(batch_graph, c_selected_node, p_selected_node_df)        
         queue_list = list(p_selected_node_df['state_hash'].values) + c_selected_node
@@ -131,7 +132,7 @@ class TestingGraphMethods(unittest.TestCase):
             columns=['state_hash', 'parent_state_hash'])
         p_selected_node_df = pd.DataFrame([['parent_state_hash_1', 1], ['parent_state_hash_2', 1]], columns=['state_hash', 'weight'])
         c_selected_node =  ['state_hash_11', 'state_hash_21']
-        p_map = [['parent_state_hash_1', 'state_hash_11'], ['parent_state_hash_2', 'state_hash_21']]
+        p_map = [['parent_state_hash_2', 'parent_state_hash_1']]
         batch_graph = create_graph(batch_df, p_selected_node_df, c_selected_node, p_map)
         weighted_graph, g_nod = apply_weights(batch_graph, c_selected_node, p_selected_node_df)        
         queue_list = list(p_selected_node_df['state_hash'].values) + c_selected_node
