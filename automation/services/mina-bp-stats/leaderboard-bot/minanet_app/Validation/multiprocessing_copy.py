@@ -17,9 +17,8 @@ def get_validate_state_hash(batch_file_list, combine_list):
         file_name = os.path.join(os.path.dirname(__file__), "test_data/uptime", file)
         file_list.append(file_name)
     file_names = ' '.join(file_list)
-
-    cmd_string1 = f'docker run --cpus={1} -v {os.path.join(os.path.dirname(__file__), "test_data")}:{os.path.join(os.path.dirname(__file__), "test_data")} ' \
-                  f'gcr.io/o1labs-192920/delegation-verify:1.2.3-mainnet --block-dir {os.path.join(os.path.dirname(__file__), "test_data/blocks", file)} '
+    cmd_string1 = f'docker run --cpus=5 -v {os.path.join(os.path.dirname(__file__), "test_data")}:{os.path.join(os.path.dirname(__file__), "test_data")} ' \
+                  f'gcr.io/o1labs-192920/delegation-verify:1.2.3-mainnet --block-dir {os.path.join(os.path.dirname(__file__), "test_data/blocks")} '
 
     command = cmd_string1 + ' ' + file_names
     # logger.info('Executing command: \n {0}'.format(command))

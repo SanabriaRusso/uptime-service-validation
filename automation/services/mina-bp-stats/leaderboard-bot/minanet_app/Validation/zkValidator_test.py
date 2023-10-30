@@ -4,8 +4,7 @@ import os
 
 class TestingZkValidator(unittest.TestCase):
     def test_get_validate_state_hash(self):
-        print ("New file", os.path.join(os.path.dirname(__file__), "test_data"))
-        file_list = ['2021-08-25T18:51:45Z-B62qrQiw9JhUumq457sMxicgQ94Z1WD9JChzJu19kBE8Szb5T8tcUAC.json']
+        file_list = ['2023-10-26T00_01_06Z-B62qoWzouroXrwjqeV8RxHHRULUaxxeN1fh247EFz2R7uGJerAF4TSn.json']
         combine_list=[]
         output = get_validate_state_hash(file_list,combine_list)
         self.assertEqual(output, [])
