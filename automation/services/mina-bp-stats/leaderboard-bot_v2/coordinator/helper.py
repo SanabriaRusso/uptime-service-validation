@@ -2,6 +2,17 @@ import psycopg2
 
 ERROR = 'Error: {0}'
 
+def getDefinedMinute(interval, offset, start_dateTime):
+    interval_range= list(range(offset, 60, interval))
+    smallest_diff = 60
+    smallest_candidate = 60
+    for candidate in interval_range:
+        diff = start_dateTime.minute - candidate
+        if diff >0 & diff<smallest_diff:
+            smallest_diff - diff
+            smallest_candidate = candidate
+    return smallest_candidate
+
 def createRegister(conn, start_date, end_date, logger):
     try:
         cursor = conn.cursor()
