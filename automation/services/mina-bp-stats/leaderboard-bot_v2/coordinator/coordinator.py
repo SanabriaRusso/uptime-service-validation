@@ -1,15 +1,11 @@
 import os
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import urllib.parse
-import time
 from kubernetes import client, config
-import threading
 from server import SimpleHTTPRequestHandler
-from helper import createRegister, updateRegister, getDefinedMinute
+from helper import createRegister, updateRegister, getDefinedMinute, checkPreviousRegister, createSlackPost
 from datetime import datetime, timedelta, timezone
 import psycopg2
-import psycopg2.extras as extras
 from dotenv import load_dotenv
 
 # Configure logging
@@ -41,17 +37,26 @@ def main():
     end_dateTime = new_time - timedelta(minutes=interval)
     createRegister(connection, start_dateTime, end_dateTime, logging)
 
-    # Step 2 Check in the register table the previous time interval completed otherwise signal error
+    # Step 2 Check in the register table the previous time interval completed otherwise signal error. How do we signal error?
+    prevRegisterOutput = checkPreviousRegister(connection, new_time, logging)
+    slack_token=os.environ["SLACK_API_TOKEN"]
+    slack_channel=os.environ["SLACK_CHANNEL"]
+    if prevRegisterOutput == False:
+        logging.error(f'Previous batch with end date {new_time} did not complete')
+        createSlackPost(slack_token, slack_channel,)
+    elif prevRegisterOutput ==  -1:
+        logging.error(f'Previous batch with end date {new_time} was never started')
+        createSlackPost(slack_token, slack_channel, f'Previous batch with end date {new_time} was never started')
     
-    # Step 3 Pull down list of files (not necessarily files themselves)
+    # Step 3 Pull down list of files (not necessarily the files themselves)
     
+
     # Step 4 Create Kubernetes ZKValidators
-    host = '0.0.0.0'  # Listen on all available network interfaces
-    port = 8080  # The port you want to listen on
+    host = os.environ['HOST']  # Listen on all available network interfaces
+    port = os.environ['PORT'] # The port you want to listen on
     server = HTTPServer((host, port), SimpleHTTPRequestHandler)
     print(f"Server started on {host}:{port}")
 
-    # Log server startup
     logging.info(f"Server started on {host}:{port}")
 
     try:
@@ -60,7 +65,9 @@ def main():
         server.shutdown()
         print("\nServer stopped.")
         logging.info("Server stopped.")
+
     # Step 5 Update table at end to say done.
     updateRegister(connection, start_dateTime, logging)
+
 if __name__ == '__main__':
     main()
