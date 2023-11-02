@@ -3,7 +3,7 @@ import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from kubernetes import client, config
 from server import SimpleHTTPRequestHandler
-from helper import createRegister, updateRegister, getDefinedMinute, checkPreviousRegister, createSlackPost
+from helper import createRegister, updateRegister, getDefinedMinute, checkPreviousRegister, createSlackPost, pullFileNames
 from datetime import datetime, timedelta, timezone
 import psycopg2
 from dotenv import load_dotenv
@@ -53,12 +53,7 @@ def main():
     
     # Step 3 Pull down list of files (not necessarily the files themselves)
     bucket= os.environ["BUCKET_NAME"]
-    script_offset = os.path.commonprefix([str(start_dateTime.strftime("%Y-%m-%dT%H:%M:%SZ")), str(end_dateTime.strftime("%Y-%m-%dT%H:%M:%SZ"))]) # This won't handle HH:40:00 to HH:00:00 +1H
-    prefix_date = start_dateTime.strftime("%Y-%m-%d")
-    prefix = 'submissions/' + prefix_date + '/' + script_offset
-    s3 = boto3.client('s3')
-    s3_bucket = s3.Bucket(bucket)
-    files_in_s3 = s3_bucket.objects.filter(Prefix=prefix).all()
+    files_in_s3 = pullFileNames(start_dateTime,end_dateTime, bucket)
     mini_batches = [files_in_s3[i::os.environ['MINI_BATCH_NUMBER']] for i in range(os.environ['MINI_BATCH_NUMBER'])]
 
     # Step 4 Create Kubernetes ZKValidators

@@ -1,6 +1,11 @@
 import psycopg2
 from slack import WebClient
 from slack.errors import SlackApiError
+import os
+import boto3
+import calendar
+from datetime import datetime, timedelta, timezone
+
 
 ERROR = 'Error: {0}'
 
@@ -66,3 +71,21 @@ def createSlackPost(token, channel, message):
         except SlackApiError as e:
         # You will get a SlackApiError if "ok" is False
             assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
+
+def pullFileNames(start_dateTime, end_dateTime, bucket_name, test=False):
+    script_offset = os.path.commonprefix([str(start_dateTime.strftime("%Y-%m-%dT%H:%M:%SZ")), str(end_dateTime.strftime("%Y-%m-%dT%H:%M:%SZ"))])
+    prefix_date = start_dateTime.strftime("%Y-%m-%d")
+    prefix = None
+    if test:
+        prefix = 'sandbox/submissions/' + prefix_date + '/' + script_offset
+    else:
+        prefix = 'submissions/' + prefix_date + '/' + script_offset
+    s3 = boto3.resource('s3')
+    s3_bucket = s3.Bucket(bucket_name)
+    return [f.key for f in s3_bucket.objects.filter(Prefix=prefix).all() if blobChecker(start_dateTime, end_dateTime, f)]
+
+
+def blobChecker(start_date, end_date, blob):
+    file_timestamp = blob.key.split('/')[3].rsplit('-', 1)[0]
+    file_epoch = datetime.strptime(file_timestamp,  "%Y-%m-%dT%H:%M:%SZ").timestamp()
+    return file_epoch < end_date.timestamp() and (file_epoch >= start_date.timestamp())
