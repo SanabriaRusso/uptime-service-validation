@@ -3,8 +3,8 @@ from slack import WebClient
 from slack.errors import SlackApiError
 import os
 import boto3
-import calendar
 from datetime import datetime, timedelta, timezone
+import pandas as pd
 
 
 ERROR = 'Error: {0}'
@@ -84,8 +84,78 @@ def pullFileNames(start_dateTime, end_dateTime, bucket_name, test=False):
     s3_bucket = s3.Bucket(bucket_name)
     return [f.key for f in s3_bucket.objects.filter(Prefix=prefix).all() if blobChecker(start_dateTime, end_dateTime, f)]
 
-
 def blobChecker(start_date, end_date, blob):
     file_timestamp = blob.key.split('/')[3].rsplit('-', 1)[0]
     file_epoch = datetime.strptime(file_timestamp,  "%Y-%m-%dT%H:%M:%SZ").timestamp()
     return file_epoch < end_date.timestamp() and (file_epoch >= start_date.timestamp())
+
+def getBatchTimings(conn, logger, interval):
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, end_date FROM bot_logs ORDER BY end_date DESC limit 1 ")
+        result = cursor.fetchone()
+        bot_log_id = result[0]
+        prev_epoch = result[1]
+
+        prev_batch_end = datetime.fromtimestamp(prev_epoch, timezone.utc)
+        cur_batch_end = prev_batch_end + timedelta(minutes=interval)
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(ERROR.format(error))
+        return -1
+    finally:
+        cursor.close()
+    return prev_batch_end, cur_batch_end, bot_log_id
+
+def getPreviousStatehash(conn, logger, bot_log_id):
+    cursor = conn.cursor()
+    try:
+        sql_query = """select  ps.value parent_statehash, s1.value statehash, b.weight
+            from bot_logs_statehash b join statehash s1 ON s1.id = b.statehash_id 
+		    join statehash ps on b.parent_statehash_id = ps.id where bot_log_id =%s"""
+        cursor.execute(sql_query, (bot_log_id,))
+        result = cursor.fetchall()
+
+        df = pd.DataFrame(result, columns=['parent_state_hash', 'state_hash', 'weight'])
+        previous_result_df = df[['parent_state_hash', 'state_hash']]
+        p_selected_node_df = df[['state_hash', 'weight']]
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(ERROR.format(error))
+        cursor.close()
+        return -1
+    finally:
+        cursor.close()
+    return previous_result_df, p_selected_node_df
+
+def getRelationList(df):
+    relation_list = []
+    for child, parent in df[['state_hash', 'parent_state_hash']].values:
+        if parent in df['state_hash'].values:
+            relation_list.append((parent, child))
+    return relation_list
+
+def getStatehashDF(conn, logger):
+    cursor = conn.cursor()
+    try:
+        cursor.execute("select value from statehash")
+        result = cursor.fetchall()
+        state_hash = pd.DataFrame(result, columns=['statehash'])
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(ERROR.format(error))
+        return -1
+    finally:
+        cursor.close()
+    return state_hash
+
+def getExistingNodes(conn, logger):
+    cursor = conn.cursor()
+    try:
+        cursor.execute("select block_producer_key from nodes")
+        result = cursor.fetchall()
+        nodes = pd.DataFrame(result, columns=['block_producer_key'])
+    except (Exception, psycopg2.DatabaseError) as error:
+        logger.error(ERROR.format(error))
+        cursor.close()
+        return -1
+    finally:
+        cursor.close()
+    return nodes
