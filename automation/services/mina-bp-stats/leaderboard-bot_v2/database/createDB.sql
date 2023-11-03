@@ -3,9 +3,9 @@ DROP TABLE IF EXISTS bot_logs;
 CREATE TABLE bot_logs (
 	id SERIAL PRIMARY KEY, 
 	name_of_file CHARACTER VARYING, 
-	epoch_time BIGINT, 
+	processing_time BIGINT, 
 	files_processed INT, 
-	file_timestamps TIMESTAMP, 
+	file_timestamp TIMESTAMP, 
 	batch_start_epoch BIGINT, 
 	batch_end_epoch BIGINT
 );
@@ -66,7 +66,7 @@ CREATE TABLE points (
 		REFERENCES statehash(id)
 );
 
---Should some of thes evalues be nullable? If uptime file doesn't pass validation, say?
+--Should some of these values be nullable? If uptime file doesn't pass validation, say?
 DROP TABLE IF EXISTS uptime_file_history;
 CREATE TABLE uptime_file_history (
 	id SERIAL PRIMARY KEY,
@@ -107,5 +107,4 @@ CREATE TABLE score_history (
 );
 
 -- Point Summary table that is auto-gen?
--- Looks like there's an apoch table as well,
--- but can't find much detail.
+-- Looks like there's an apoch table as well, but can't find much detail.
