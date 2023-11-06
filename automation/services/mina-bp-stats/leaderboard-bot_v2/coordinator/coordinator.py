@@ -57,122 +57,144 @@ def main():
             if (all_files_count>0):
                 mini_batches = [files_in_s3[i::os.environ['MINI_BATCH_NUMBER']] for i in range(os.environ['MINI_BATCH_NUMBER'])]
 
-        # Step 3 Create Kubernetes ZKValidators
-                start = time()
-                host = os.environ['HOST']  # Listen on all available network interfaces
-                port = os.environ['PORT'] # The port you want to listen on
-                server = HTTPServer((host, port), SimpleHTTPRequestHandler)
-                print(f"Server started on {host}:{port}")
-                logging.info(f"Server started on {host}:{port}")
-                try:
-                    server.serve_forever()
-                except KeyboardInterrupt:
-                    server.shutdown()
-                    print("\nServer stopped.")
-                    logging.info("Server stopped.")
-                end = time()
-                # state_hash_df is what will be returned by the ZKValidators
+        # Step 3 Create Kubernetes ZKValidators and pass mini-batches.
+            worker_image=os.environ['WORKER_IMAGE']
+            worker_tag=os.environ['WORKER_TAG'],
+            start = time()
+            for index, mini_batch in enumerate(mini_batches):
+                job_name = f"zk-validator-{time.strftime('%y-%m-%d-%H-%M')}-{index}" # ZKValidator
 
+                job = client.V1Job(
+                    metadata=client.V1ObjectMeta(name=job_name),
+                    spec=client.V1JobSpec(
+                        template=client.V1PodTemplateSpec(
+                            spec=client.V1PodSpec(
+                                containers=[
+                                    client.V1Container(
+                                        name="zk-validator",
+                                        image=f"{worker_image}:{worker_tag}",
+                                        command=["sleep", "10"],
+                                        env=[
+                                            client.V1EnvVar(name="JobName", value=f"{job_name}"),
+                                            client.V1EnvVar(name="FileBatchList", value=f'{mini_batch}'),
+                                        ],
+                                        image_pull_policy="Always",  # Set the image pull policy here
+                                    )
+                                ],
+                                restart_policy="Never",
+                            )
+                        )
+                    )
+                )
+
+            namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
+            api.create_namespaced_job(namespace, job)
+
+            logging.info(f"Launching pod {index}")
+                                
+            end = time()
+        # state_hash_df is what will be returned by the ZKValidators
+        # The jobs will have written their output to a database.
         # Step 4 checks for forks and writes to the db.
-                if not state_hash_df.empty:
-                    master_df['state_hash'] = state_hash_df['state_hash']
-                    master_df['blockchain_height'] = state_hash_df['height']
-                    master_df['slot'] = pd.to_numeric(state_hash_df['slot'])
-                    master_df['parent_state_hash'] = state_hash_df['parent']
+            if not state_hash_df.empty:
+                master_df['state_hash'] = state_hash_df['state_hash']
+                master_df['blockchain_height'] = state_hash_df['height']
+                master_df['slot'] = pd.to_numeric(state_hash_df['slot'])
+                master_df['parent_state_hash'] = state_hash_df['parent']
 
-                    state_hash = pd.unique(master_df[['state_hash', 'parent_state_hash']].values.ravel('k'))
-                    state_hash_to_insert = findNewValuesToInsert(existing_state_df, pd.DataFrame(state_hash, columns=['statehash']))
-                    if not state_hash_to_insert.empty:
-                        createStatehash(connection, logging, state_hash_to_insert)
+                state_hash = pd.unique(master_df[['state_hash', 'parent_state_hash']].values.ravel('k'))
+                state_hash_to_insert = findNewValuesToInsert(existing_state_df, pd.DataFrame(state_hash, columns=['statehash']))
+                if not state_hash_to_insert.empty:
+                    createStatehash(connection, logging, state_hash_to_insert)
 
-                    nodes_in_cur_batch = pd.DataFrame(master_df['submitter'].unique(),
-                                                        columns=['block_producer_key'])
-                    node_to_insert = findNewValuesToInsert(existing_nodes, nodes_in_cur_batch)
+                nodes_in_cur_batch = pd.DataFrame(master_df['submitter'].unique(),
+                                                    columns=['block_producer_key'])
+                node_to_insert = findNewValuesToInsert(existing_nodes, nodes_in_cur_batch)
 
-                    if not node_to_insert.empty:
-                        node_to_insert['updated_at'] = datetime.now(timezone.utc)
-                        createNodeRecord(connection, logging, node_to_insert, 100)
+                if not node_to_insert.empty:
+                    node_to_insert['updated_at'] = datetime.now(timezone.utc)
+                    createNodeRecord(connection, logging, node_to_insert, 100)
+                
+                if 'snark_work' in master_df.columns:
+                    master_df.drop('snark_work', axis=1, inplace=True)
 
-                    if 'snark_work' in master_df.columns:
-                        master_df.drop('snark_work', axis=1, inplace=True)
+                columns_to_drop = ['remote_addr', 'file_created',
+                                    'file_generation', 'file_owner', 'file_crc32c', 'file_md5_hash']
+                master_df.drop(columns=columns_to_drop, axis=1, inplace=True, errors='ignore')
+                master_df = master_df.rename(
+                    columns={'file_updated': 'file_timestamps', 'submitter': 'block_producer_key'})
 
-                    columns_to_drop = ['remote_addr', 'file_created',
-                                        'file_generation', 'file_owner', 'file_crc32c', 'file_md5_hash']
-                    master_df.drop(columns=columns_to_drop, axis=1, inplace=True, errors='ignore')
-                    master_df = master_df.rename(
-                        columns={'file_updated': 'file_timestamps', 'submitter': 'block_producer_key'})
+                c_selected_node = filterStateHashPercentage(master_df)
+                batch_graph = createGraph(master_df, p_selected_node_df, c_selected_node, p_map)
+                weighted_graph = applyWeights(batch_graph=batch_graph, c_selected_node=c_selected_node,
+                                                        p_selected_node=p_selected_node_df)
 
-                    c_selected_node = filterStateHashPercentage(master_df)
-                    batch_graph = createGraph(master_df, p_selected_node_df, c_selected_node, p_map)
-                    weighted_graph = applyWeights(batch_graph=batch_graph, c_selected_node=c_selected_node,
-                                                            p_selected_node=p_selected_node_df)
+                queue_list = list(p_selected_node_df['state_hash'].values) + c_selected_node
 
-                    queue_list = list(p_selected_node_df['state_hash'].values) + c_selected_node
+                batch_state_hash = list(master_df['state_hash'].unique())
 
-                    batch_state_hash = list(master_df['state_hash'].unique())
+                shortlisted_state_hash_df = bfs(graph=weighted_graph, queue_list=queue_list, node=queue_list[0],
+                                                batch_statehash=batch_state_hash)
+                point_record_df = master_df[
+                    master_df['state_hash'].isin(shortlisted_state_hash_df['state_hash'].values)]
 
-                    shortlisted_state_hash_df = bfs(graph=weighted_graph, queue_list=queue_list, node=queue_list[0],
-                                                    batch_statehash=batch_state_hash)
-                    point_record_df = master_df[
-                        master_df['state_hash'].isin(shortlisted_state_hash_df['state_hash'].values)]
+                for index, row in shortlisted_state_hash_df.iterrows():
+                    if not row['state_hash'] in batch_state_hash:
+                        shortlisted_state_hash_df.drop(index, inplace=True, axis=0)
+                p_selected_node_df = shortlisted_state_hash_df.copy()
+                parent_hash = []
+                for s in shortlisted_state_hash_df['state_hash'].values:
+                    p_hash = master_df[master_df['state_hash'] == s]['parent_state_hash'].values[0]
+                    parent_hash.append(p_hash)
+                shortlisted_state_hash_df['parent_state_hash'] = parent_hash
 
-                    for index, row in shortlisted_state_hash_df.iterrows():
-                        if not row['state_hash'] in batch_state_hash:
-                            shortlisted_state_hash_df.drop(index, inplace=True, axis=0)
-                    p_selected_node_df = shortlisted_state_hash_df.copy()
-                    parent_hash = []
-                    for s in shortlisted_state_hash_df['state_hash'].values:
-                        p_hash = master_df[master_df['state_hash'] == s]['parent_state_hash'].values[0]
-                        parent_hash.append(p_hash)
-                    shortlisted_state_hash_df['parent_state_hash'] = parent_hash
-
-                    p_map = getRelationList(shortlisted_state_hash_df[['parent_state_hash', 'state_hash']])
-                    try:
-                        if not point_record_df.empty:
-                            file_timestamp = master_df.iloc[-1]['file_timestamps']
-                        else:
-                            file_timestamp = cur_batch_end
-                            logging.info('empty point record for start epoch {0} end epoch {1} '.format(
-                                prev_batch_end.timestamp(), cur_batch_end.timestamp()))
-
-                        values = all_files_count, file_timestamp, prev_batch_end.timestamp(), cur_batch_end.timestamp(), end - start
-                        bot_log_id = createBotLog(connection, values)
-
-                        shortlisted_state_hash_df['bot_log_id'] = bot_log_id
-                        insertStatehashResults(shortlisted_state_hash_df)
-
-                        if not point_record_df.empty:
-                            point_record_df['amount'] = 1
-                            point_record_df['created_at'] = datetime.now(timezone.utc)
-                            point_record_df['bot_log_id'] = bot_log_id
-                            point_record_df = point_record_df[
-                                ['file_name', 'file_timestamps', 'blockchain_epoch', 'block_producer_key',
-                                    'blockchain_height', 'amount', 'created_at', 'bot_log_id', 'state_hash']]
-
-                            createPointRecord(connection, point_record_df)
-                    except Exception as error:
-                        connection.rollback()
-                        logging.error(ERROR.format(error))
-                    finally:
-                        connection.commit()
-                    process_loop_count += 1
-                    logging.info('Processed it loop count : {0}'.format(process_loop_count))
-
-                else:
-                    logging.info('Finished processing data from table.')
+                p_map = getRelationList(shortlisted_state_hash_df[['parent_state_hash', 'state_hash']])
                 try:
-                    #The following needs to change.
-                    updateScoreboard(connection, cur_batch_end, int(os.environ['UPTIME_DAYS_FOR_SCORE']))
+                    if not point_record_df.empty:
+                        file_timestamp = master_df.iloc[-1]['file_timestamps']
+                    else:
+                        file_timestamp = cur_batch_end
+                        logging.info('empty point record for start epoch {0} end epoch {1} '.format(
+                            prev_batch_end.timestamp(), cur_batch_end.timestamp()))
+
+                    values = all_files_count, file_timestamp, prev_batch_end.timestamp(), cur_batch_end.timestamp(), end - start
+                    bot_log_id = createBotLog(connection, values)
+
+                    shortlisted_state_hash_df['bot_log_id'] = bot_log_id
+                    insertStatehashResults(shortlisted_state_hash_df)
+
+                    if not point_record_df.empty:
+                        point_record_df['amount'] = 1
+                        point_record_df['created_at'] = datetime.now(timezone.utc)
+                        point_record_df['bot_log_id'] = bot_log_id
+                        point_record_df = point_record_df[
+                            ['file_name', 'file_timestamps', 'blockchain_epoch', 'block_producer_key',
+                                'blockchain_height', 'amount', 'created_at', 'bot_log_id', 'state_hash']]
+
+                        createPointRecord(connection, point_record_df)
                 except Exception as error:
                     connection.rollback()
                     logging.error(ERROR.format(error))
                 finally:
                     connection.commit()
+                process_loop_count += 1
+                logging.info('Processed it loop count : {0}'.format(process_loop_count))
 
-                prev_batch_end = cur_batch_end
-                cur_batch_end = prev_batch_end + timedelta(minutes=interval)
-                if prev_batch_end >= cur_timestamp: # This gets the coordinator to continue onto the next batch if it's taking so long as for the next interval is already finished.
-                    do_process = False
+            else:
+                logging.info('Finished processing data from table.')
+            try:
+                #The following needs to change.
+                updateScoreboard(connection, cur_batch_end, int(os.environ['UPTIME_DAYS_FOR_SCORE']))
+            except Exception as error:
+                connection.rollback()
+                logging.error(ERROR.format(error))
+            finally:
+                connection.commit()
+
+            prev_batch_end = cur_batch_end
+            cur_batch_end = prev_batch_end + timedelta(minutes=interval)
+            if prev_batch_end >= cur_timestamp: # This gets the coordinator to continue onto the next batch if it's taking so long as for the next interval is already finished.
+                        do_process = False
 
 if __name__ == '__main__':
     main()

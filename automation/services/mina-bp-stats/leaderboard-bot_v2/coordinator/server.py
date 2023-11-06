@@ -12,32 +12,8 @@ worker_image = os.environ.get("WORKER_IMAGE", "busybox")
 worker_tag = os.environ.get("WORKER_TAG", "latest")
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-
-        query_params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        workers = query_params.get('workers', [''])[0]
-
-        logging.info(f"Received request with workers={workers}")
-
-        self.wfile.write(f'Workers: {workers}\n'.encode('utf-8'))
-
-        if workers:
-            # Create a list to hold the worker threads
-            worker_threads = []
-            for i in range(int(workers)):
-                worker_thread = threading.Thread(target=self.create_and_monitor_pod, args=(i,))
-                worker_threads.append(worker_thread)
-                worker_thread.start()
-
-            # Wait for all worker threads to finish
-            for worker_thread in worker_threads:
-                worker_thread.join()
-
     def create_and_monitor_pod(self, index):
-        job_name = f"job-{time.strftime('%y-%m-%d-%H-%M')}-{index}"
+        job_name = f"job-{time.strftime('%y-%m-%d-%H-%M')}-{index}" # ZKValidator
 
         job = client.V1Job(
             metadata=client.V1ObjectMeta(name=job_name),
@@ -46,9 +22,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                     spec=client.V1PodSpec(
                         containers=[
                             client.V1Container(
-                                name="my-container",
+                                name="zk-validator",
                                 image=f"{worker_image}:{worker_tag}",
                                 command=["sleep", "10"],
+                                env=[
+                                    client.V1EnvVar(name="JobName", value="value1"),
+                                    client.V1EnvVar(name="FileBatchList", value='[]'),
+                                ],
+                                image_pull_policy="Always",  # Set the image pull policy here
                             )
                         ],
                         restart_policy="Never",

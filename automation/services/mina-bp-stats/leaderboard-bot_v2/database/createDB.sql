@@ -5,7 +5,7 @@ CREATE TABLE bot_logs (
 	name_of_file CHARACTER VARYING, 
 	processing_time BIGINT, 
 	files_processed INT, 
-	file_timestamp TIMESTAMP, 
+	file_timestamps TIMESTAMP, 
 	batch_start_epoch BIGINT, 
 	batch_end_epoch BIGINT
 );

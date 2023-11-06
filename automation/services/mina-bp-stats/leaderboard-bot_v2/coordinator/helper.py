@@ -26,7 +26,7 @@ def createRegister(conn, start_date, end_date, logger):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            f"""INSERT INTO uptime_reports.register(start_date, end_date)
+            f"""INSERT INTO register(start_date, end_date)
                 VALUES ({start_date}, {end_date});"""
                             )
     except (Exception, psycopg2.DatabaseError) as error:
@@ -40,7 +40,7 @@ def checkPreviousRegister(conn, start_date, logger):
         cursor = conn.cursor()
         cursor.execute(
             f"""SELECT done
-                DROM uptime_reports.register
+                FROM register
                 WHERE end_date = {start_date};"""
                             )
         return cursor.fetchone()[0]
@@ -54,7 +54,7 @@ def updateRegister(conn, start_date, logger):
     try:
         cursor = conn.cursor()
         cursor.execute(
-            f"""UPDATE uptime_reports.register(
+            f"""UPDATE register(
                 set done = TRUE,
                 WHERE start_date = {start_date};"""
                             )
@@ -291,7 +291,6 @@ def bfs(graph, queue_list, node, max_depth =2):
     return shortlisted_state_hash_df
 
 def createBotLog(conn, logger, values):
-    # files_processed file_timestamps state_hash batch_start_epoch batch_end_epoch
     query = """INSERT INTO bot_logs(files_processed, file_timestamps, batch_start_epoch, batch_end_epoch, 
                 processing_time)  values ( %s, %s, %s, %s, %s) RETURNING id """
     try:
