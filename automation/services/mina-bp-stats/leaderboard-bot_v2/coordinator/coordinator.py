@@ -2,7 +2,7 @@ import os
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from kubernetes import client, config
-from server import SimpleHTTPRequestHandler
+from server import setUpValidatorPods
 from datetime import datetime, timedelta, timezone
 import psycopg2
 from dotenv import load_dotenv
@@ -15,9 +15,6 @@ logging.basicConfig(filename='server.log', level=logging.INFO, format='%(asctime
 
 # Load the in-cluster configuration
 config.load_incluster_config()
-
-# Create a Kubernetes API client
-api = client.BatchV1Api()
 
 def main():
     load_dotenv()
@@ -48,53 +45,18 @@ def main():
             return
         else:
             master_df = pd.DataFrame() 
-            state_hash_df = pd.DataFrame() 
-        
-        # Step 2 Pull down list of files (not necessarily the files themselves)
-            bucket= os.environ["BUCKET_NAME"]
-            files_in_s3 = pullFileNames(prev_batch_end,cur_batch_end, bucket)
-            all_files_count = len(files_in_s3)
-            if (all_files_count>0):
-                mini_batches = [files_in_s3[i::os.environ['MINI_BATCH_NUMBER']] for i in range(os.environ['MINI_BATCH_NUMBER'])]
-
+            state_hash_df = pd.DataFrame()       
+        # Step 2 Create time ranges:
+            time_intervals = getTimeBatches(prev_batch_end, cur_batch_end, os.environ['MINI_BATCH_NUMBER'])
         # Step 3 Create Kubernetes ZKValidators and pass mini-batches.
             worker_image=os.environ['WORKER_IMAGE']
             worker_tag=os.environ['WORKER_TAG'],
             start = time()
-            for index, mini_batch in enumerate(mini_batches):
-                job_name = f"zk-validator-{time.strftime('%y-%m-%d-%H-%M')}-{index}" # ZKValidator
-
-                job = client.V1Job(
-                    metadata=client.V1ObjectMeta(name=job_name),
-                    spec=client.V1JobSpec(
-                        template=client.V1PodTemplateSpec(
-                            spec=client.V1PodSpec(
-                                containers=[
-                                    client.V1Container(
-                                        name="zk-validator",
-                                        image=f"{worker_image}:{worker_tag}",
-                                        command=["sleep", "10"],
-                                        env=[
-                                            client.V1EnvVar(name="JobName", value=f"{job_name}"),
-                                            client.V1EnvVar(name="FileBatchList", value=f'{mini_batch}'),
-                                        ],
-                                        image_pull_policy="Always",  # Set the image pull policy here
-                                    )
-                                ],
-                                restart_policy="Never",
-                            )
-                        )
-                    )
-                )
-
-            namespace = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read()
-            api.create_namespaced_job(namespace, job)
-
-            logging.info(f"Launching pod {index}")
-                                
+            jobs = []            
+            setUpValidatorPods(time_intervals, jobs, logging, worker_image, worker_tag)
             end = time()
-        # state_hash_df is what will be returned by the ZKValidators
-        # The jobs will have written their output to a database.
+        # The jobs will have written their output to a database -which we now need to read from.
+        # We need to read the ZKVAlidator results from a db.
         # Step 4 checks for forks and writes to the db.
             if not state_hash_df.empty:
                 master_df['state_hash'] = state_hash_df['state_hash']

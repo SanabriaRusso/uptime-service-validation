@@ -22,6 +22,14 @@ def getDefinedMinute(interval, offset, start_dateTime):
             smallest_candidate = candidate
     return smallest_candidate
 
+def getTimeBatches(start_time, end_time, range_number):
+    diff = (end_time  - start_time ) / range_number
+    print(diff)
+    time_intervals = []
+    for i in range(range_number):
+         time_intervals.append((start_time + diff*i, start_time + diff * (i+1)))
+    return time_intervals
+
 def createRegister(conn, start_date, end_date, logger):
     try:
         cursor = conn.cursor()
@@ -326,7 +334,7 @@ def insertStatehashResults(conn, logger, df, page_size=100):
 
 def createPointRecord(conn, logger, df, page_size=100):
     tuples = [tuple(x) for x in df.to_numpy()]
-    query = """INSERT INTO points ( file_name, file_timestamps, blockchain_epoch, node_id, blockchain_height,
+    query = """INSERT INTO points (file_name, file_timestamps, blockchain_epoch, node_id, blockchain_height,
                 amount, created_at, bot_log_id, statehash_id) 
             VALUES ( %s, %s,  %s, (SELECT id FROM nodes WHERE block_producer_key= %s), %s, %s, 
                     %s, %s, (SELECT id FROM statehash WHERE value= %s) )"""
@@ -357,7 +365,7 @@ def updateScoreboard(conn, logger, score_till_time, uptime_days=30):
 	)
 	, scores as (
 		select p.node_id, count(p.bot_log_id) bp_points
-		from points_summary p join bot_logs b on p.bot_log_id =b.id, epochs
+		from points p join bot_logs b on p.bot_log_id =b.id, epochs
 		where b.batch_start_epoch >= start_epoch and  b.batch_end_epoch <= end_epoch
 		group by 1
 	)

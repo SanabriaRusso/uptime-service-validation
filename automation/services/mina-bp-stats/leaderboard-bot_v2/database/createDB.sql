@@ -52,9 +52,9 @@ CREATE TABLE points (
 	blockchain_height BIGINT NOT NULL,
     amount INT NOT NULL, 
 	created_at TIMESTAMP NOT NULL,
-	node_id int,
-	bot_log_id int,
-	statehash_id int
+	node_id INT,
+	bot_log_id INT,
+	statehash_id INT
 	CONSTRAINT fk_nodes
 		FOREIGN KEY(node_id) 
 		REFERENCES nodes(id),
@@ -106,5 +106,14 @@ CREATE TABLE score_history (
 		REFERENCES nodes(id)
 );
 
+DROP TABLE IF EXISTS zk_validator;
+CREATE TABLE zkValidator (
+	id SERIAL PRIMARY KEY,
+	name_of_file CHARACTER VARYING NOT NULL, 
+	state_hash CHARACTER VARYING NULL,
+	parent_hash CHARACTER VARYING NULL,
+	height BIGINT NOT NULL DEFAULT 0, 
+	slot BIGINT NOT NULL DEFAULT 0 
+);
 -- Point Summary table that is auto-gen?
 -- Looks like there's an apoch table as well, but can't find much detail.
