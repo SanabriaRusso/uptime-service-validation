@@ -56,7 +56,7 @@ def main():
             setUpValidatorPods(time_intervals, jobs, logging, worker_image, worker_tag)
             end = time()
         # The jobs will have written their output to a database -which we now need to read from.
-        # We need to read the ZKVAlidator results from a db.
+        # We need to read the ZKValidator results from a db.
         # Step 4 checks for forks and writes to the db.
             if not state_hash_df.empty:
                 master_df['state_hash'] = state_hash_df['state_hash']

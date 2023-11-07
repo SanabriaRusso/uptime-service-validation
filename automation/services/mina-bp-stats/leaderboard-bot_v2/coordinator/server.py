@@ -25,7 +25,8 @@ def setUpValidatorPods(time_intervals, jobs, logging, worker_image, worker_tag):
                                             command=["sleep", "10"],
                                             env=[
                                                 client.V1EnvVar(name="JobName", value=f"{job_name}"),
-                                                client.V1EnvVar(name="FileBatchList", value=f'{mini_batch}'),
+                                                client.V1EnvVar(name="BatchStart", value=f'{mini_batch[index][0]}'),
+                                                client.V1EnvVar(name="BatchEnd", value=f'{mini_batch[index][1]}')
                                             ],
                                             image_pull_policy="Always",  # Set the image pull policy here
                                         )

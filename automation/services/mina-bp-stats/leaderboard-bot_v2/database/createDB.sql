@@ -79,8 +79,8 @@ CREATE TABLE uptime_file_history (
 	node_id INT NOT NULL, 
 	block_statehash INT,
     parent_block_statehash INT 
-	nodedata_blockheight BIGINT NOT NULL, 
-	nodedata_slot BIGINT NOT NULL, 
+	nodedata_blockheight BIGINT, 
+	nodedata_slot BIGINT, 
 	file_modified_at TIMESTAMP(6), 
 	file_created_at TIMESTAMP(6), 
 	file_generation BIGINT,
