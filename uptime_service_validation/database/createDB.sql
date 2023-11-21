@@ -122,4 +122,3 @@ CREATE TABLE zk_validator (
 	slot BIGINT NOT NULL DEFAULT 0 
 );
 -- Point Summary table that is auto-gen?
--- Looks like there's an apoch table as well, but can't find much detail.
