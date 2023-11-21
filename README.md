@@ -61,4 +61,4 @@ To connect to AWS Keyspaces, the following environment variables need to be set:
 The program needs:
 * The tables set up (see createDB.sql)
 * The .env file set up
-* Execute the python script
+* Execute coordinator.py
