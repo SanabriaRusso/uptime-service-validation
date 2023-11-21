@@ -26,6 +26,7 @@ jobs:
 
     - name: ⚙️ Install dependencies
       run: |
+        sudo apt-get install -y libpq-dev libpq5
         pip install poetry
         poetry install
 
