@@ -89,6 +89,64 @@ class AWSKeyspacesClient:
         else:
             return self.session.execute(query)
 
+    def analyze_submissions(self):
+        query = f"SELECT * FROM {self.aws_keyspace}.submissions"
+        rows = self.execute_query(query)
+        submissions = [row.submitter for row in rows]
+        unique_submitters = set(submissions)
+        submitter_counts = {}
+        for submitter in submissions:
+            if submitter in submitter_counts:
+                submitter_counts[submitter] += 1
+            else:
+                submitter_counts[submitter] = 1
+
+        print("Number of submissions:", len(submissions))
+        print("Number of unique submitters:", len(unique_submitters))
+        print("Submissions per submitter:")
+        for submitter, count in submitter_counts.items():
+            print(f"  Submitter: {submitter}, Entries: {count}")
+
+    def analyze_blocks(self):
+        query = f"SELECT block_hash, raw_block FROM {self.aws_keyspace}.blocks"
+        rows = self.execute_query(query)
+        blocks = [row[1] for row in rows]
+        unique_blocks = set(blocks)
+        # get blocks 0-100KB
+        small_blocks = [block for block in blocks if len(block) <= 100000]
+        # get blocks 100-500KB
+        medium_blocks = [
+            block for block in blocks if len(block) > 100000 and len(block) <= 500000
+        ]
+        # get blocks 500KB - 1MB
+        one_mb_blocks = [
+            block for block in blocks if len(block) > 500000 and len(block) <= 1000000
+        ]
+        # get blocks 1MB - 2MB
+        two_mb_blocks = [
+            block for block in blocks if len(block) > 1000000 and len(block) <= 2000000
+        ]
+        # get blocks over 2MB
+        large_blocks = [block for block in blocks if len(block) > 2000000]
+
+        # biggest block
+        biggest_block = max(blocks, key=len)
+        # smallest block
+        smallest_block = min(blocks, key=len)
+        print("Number of blocks:", len(blocks))
+        print("Number of unique blocks:", len(unique_blocks))
+        print("Number of blocks smaller than 100KB:", len(small_blocks))
+        print("Number of blocks between 100KB and 500KB:", len(medium_blocks))
+        print("Number of blocks between 500KB and 1MB:", len(one_mb_blocks))
+        print("Number of blocks between 1MB and 2MB:", len(two_mb_blocks))
+        print("Number of blocks over 2MB:", len(large_blocks))
+        print(f"Biggest block: {len(biggest_block)/1000}KB")
+        print(f"Smallest block: {len(smallest_block)/1000}KB")
+        print(
+            f"Average block size:{sum(len(block) for block in blocks) / len(blocks) / 1000}KB"
+        )
+        # print(biggest_block)
+
     def get_blocks(
         self, limit: Optional[int] = None, block_hash: Optional[str] = None
     ) -> List[Block]:
@@ -226,44 +284,51 @@ if __name__ == "__main__":
     client = AWSKeyspacesClient()
     try:
         client.connect()
-        print("All blocks:")
-        all_blocks = client.get_blocks()
-        print("Number of blocks:", len(all_blocks))
-        print()
+        # print("All blocks:")
+        # all_blocks = client.get_blocks()
+        # print("Number of blocks:", len(all_blocks))
+        # print()
 
-        print("Specific block:")
-        specific_block = client.get_blocks(
-            block_hash="YnmzigsYK5tiybax6LT9c2NyVxEPd6or5aqbQG5mZWnbMZrxGX"
-        )
-        print(specific_block[0].block_hash)
-        print()
+        # print("Specific block:")
+        # specific_block = client.get_blocks(
+        #     block_hash="YnmzigsYK5tiybax6LT9c2NyVxEPd6or5aqbQG5mZWnbMZrxGX"
+        # )
+        # print(specific_block[0].block_hash)
+        # print()
 
-        print("Four blocks:")
-        four_blocks = client.get_blocks(limit=4)
-        for block in four_blocks:
-            print(block.block_hash)
-        print()
+        # print("Four blocks:")
+        # four_blocks = client.get_blocks(limit=4)
+        # for block in four_blocks:
+        #     print(block.block_hash)
+        # print()
 
-        print("All submissions:")
-        submissions = client.get_submissions()
-        print("Number of submissions:", len(submissions))
-        print()
+        # print("All submissions:")
+        # submissions = client.get_submissions()
+        # print("Number of submissions:", len(submissions))
+        # print()
 
-        print("Specific submissions:")
-        start = datetime(2023, 11, 9, 16, 2, 0)
-        end = datetime(2023, 11, 14, 13, 26, 10)
-        submissions = client.get_submissions(
-            submitted_at_start=start,
-            submitted_at_end=end,
-            start_inclusive=True,
-            end_inclusive=False,
-        )
-        for submission in submissions:
-            print(submission.submitter, submission.submitted_at, submission.block_hash)
-        print(
-            "Number of submissions between '%s' and '%s': %s"
-            % (start, end, len(submissions))
-        )
+        # print("Specific submissions:")
+        # start = datetime(2023, 11, 9, 16, 2, 0)
+        # end = datetime(2023, 11, 14, 13, 26, 10)
+        # submissions = client.get_submissions(
+        #     submitted_at_start=start,
+        #     submitted_at_end=end,
+        #     start_inclusive=True,
+        #     end_inclusive=False,
+        # )
+        # for submission in submissions:
+        #     print(submission.submitter, submission.submitted_at, submission.block_hash)
+        # print(
+        #     "Number of submissions between '%s' and '%s': %s"
+        #     % (start, end, len(submissions))
+        # )
+
+        print("Analyze blocks:")
+        client.analyze_blocks()
+        print()
+        print("Analyze submissions:")
+        client.analyze_submissions()
+        print()
 
     finally:
         client.close()
