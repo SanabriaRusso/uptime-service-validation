@@ -90,19 +90,61 @@ class AWSKeyspacesClient:
             return self.session.execute(query)
 
     def analyze_submissions(self):
-        query = f"SELECT * FROM {self.aws_keyspace}.submissions"
+        query = f"SELECT submitter, snark_work FROM {self.aws_keyspace}.submissions"
         rows = self.execute_query(query)
-        submissions = [row.submitter for row in rows]
-        unique_submitters = set(submissions)
+        # Initialize dictionaries and lists
         submitter_counts = {}
-        for submitter in submissions:
+        snark_works = []
+        submissions = []
+
+        # Process each row
+        for row in rows:
+            submissions.append(row)
+            submitter = row[0]
+            snark_work = row[1]
+
+            # Count submitters
             if submitter in submitter_counts:
                 submitter_counts[submitter] += 1
             else:
                 submitter_counts[submitter] = 1
+            # Collect snark works if not None
+            if snark_work is not None:
+                snark_works.append(snark_work)
 
+        # Classify snark works by size
+        small_snark_works = [work for work in snark_works if len(work) <= 100000]
+        medium_snark_works = [
+            work for work in snark_works if 100000 < len(work) <= 500000
+        ]
+        one_mb_snark_works = [
+            work for work in snark_works if 500000 < len(work) <= 1000000
+        ]
+        two_mb_snark_works = [
+            work for work in snark_works if 1000000 < len(work) <= 2000000
+        ]
+        large_snark_works = [work for work in snark_works if len(work) > 2000000]
+
+        # Output analysis
         print("Number of submissions:", len(submissions))
-        print("Number of unique submitters:", len(unique_submitters))
+        print("Number of unique submitters:", len(submitter_counts))
+        print("Number of submissions with snark work:", len(snark_works))
+        print(
+            "Number of submissions without snark work:",
+            len(submissions) - len(snark_works),
+        )
+        print("Number of snark work smaller than 100KB:", len(small_snark_works))
+        print("Number of snark work between 100KB and 500KB:", len(medium_snark_works))
+        print("Number of snark work between 500KB and 1MB:", len(one_mb_snark_works))
+        print("Number of snark work between 1MB and 2MB:", len(two_mb_snark_works))
+        print("Number of snark work over 2MB:", len(large_snark_works))
+        if snark_works:  # Check if list is not empty
+            print(f"Biggest snark work: {len(max(snark_works, key=len))} bytes")
+            print(f"Smallest snark work: {len(min(snark_works, key=len))} bytes")
+            print(
+                f"Average snark work size: {sum(len(work) for work in snark_works) / len(snark_works)} bytes"
+            )
+
         print("Submissions per submitter:")
         for submitter, count in submitter_counts.items():
             print(f"  Submitter: {submitter}, Entries: {count}")
