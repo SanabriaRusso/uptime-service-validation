@@ -218,14 +218,16 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
                         service_account_name=service_account_name,
                         volumes=[auth_volume, entrypoint_volume],
                     )
-                )
+                ),
             ),
         )
 
         # Create the job and configmap in Kubernetes
         try:
             api_batch.create_namespaced_job(namespace, job)
-            logging.info(f"Job {job_name} created in namespace {namespace}")
+            logging.info(
+                f"Job {job_name} created in namespace {namespace}; start: {datetime_formatter(mini_batch[0])}, end: {datetime_formatter(mini_batch[1])}."
+            )
             jobs.append(job_name)
         except Exception as e:
             logging.error(f"Error creating job {job_name}: {e}")
