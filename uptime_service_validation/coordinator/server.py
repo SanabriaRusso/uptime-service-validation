@@ -327,8 +327,6 @@ def setUpValidatorProcesses(time_intervals, logging, worker_image, worker_tag):
             "SSL_CERTFILE=/var/ssl/ssl-cert.crt",
             "-e",
             "CASSANDRA_USE_SSL=1",
-            "-e",
-            "CQLSH=/bin/cqlsh-expansion",
             image,
             # "cassandra",
             # "--keyspace",
@@ -336,8 +334,6 @@ def setUpValidatorProcesses(time_intervals, logging, worker_image, worker_tag):
             f"{datetime_formatter(mini_batch[0])}",
             f"{datetime_formatter(mini_batch[1])}",
         ]
-        if bool_env_var_set("NO_CHECKS"):
-            command.append("--no-checks")
         cmd_str = " ".join(command)
 
         # Set up environment variables for the process
