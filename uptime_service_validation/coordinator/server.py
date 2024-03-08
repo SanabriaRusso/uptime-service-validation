@@ -234,7 +234,6 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
                 ttl_seconds_after_finished=ttl_seconds,
                 template=client.V1PodTemplateSpec(
                     spec=client.V1PodSpec(
-                        init_containers=[init_container],
                         containers=[container],
                         restart_policy="Never",
                         service_account_name=service_account_name,
