@@ -225,17 +225,6 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
             ],
         )
 
-        # Define the init container
-        init_container = client.V1Container(
-            name="delegation-verify-init",
-            image=f"{worker_image}:{worker_tag}",
-            # command=["/bin/authenticate.sh"],
-            command=["ls"],
-            env=env_vars,
-            image_pull_policy=os.environ.get("IMAGE_PULL_POLICY", "IfNotPresent"),
-            volume_mounts=[auth_volume_mount],
-        )
-
         # Create the job
         job = client.V1Job(
             api_version="batch/v1",
