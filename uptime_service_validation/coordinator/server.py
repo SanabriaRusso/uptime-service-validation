@@ -127,7 +127,7 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
             client.V1EnvVar(name="CASSANDRA_USE_SSL", value="1"),
             client.V1EnvVar(
                 name="SSL_CERTFILE",
-                value="/var/ssl/ssl-cert.crt",
+                value="/root/.cassandra/sf-class2-root.crt",
             ),
             client.V1EnvVar(
                 name="CQLSH",
@@ -302,6 +302,8 @@ def setUpValidatorProcesses(time_intervals, logging, worker_image, worker_tag):
             "SSL_CERTFILE=/var/ssl/ssl-cert.crt",
             "-e",
             "CASSANDRA_USE_SSL=1",
+            "-e",
+            "CQLSH=/bin/cqlsh-expansion",
             image,
             # "cassandra",
             # "--keyspace",
