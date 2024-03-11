@@ -178,7 +178,7 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
                 name=entrypoint_configmap_name, default_mode=int("0777", 8)
             ),  # 0777 permission in octal as int
         )
-       cassandra_ssl_volume = client.V1Volume(
+        cassandra_ssl_volume = client.V1Volume(
             name="cassandra-crt",
             secret=client.V1SecretVolumeSource(
                 secret_name="uptime-service-cassandra-crt"
