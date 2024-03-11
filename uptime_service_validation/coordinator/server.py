@@ -127,7 +127,7 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
             client.V1EnvVar(name="CASSANDRA_USE_SSL", value="1"),
             client.V1EnvVar(
                 name="SSL_CERTFILE",
-                value="/root/.cassandra/sf-class2-root.crt",
+                value=os.environ.get("SSL_CERTFILE"),,
             ),
             client.V1EnvVar(
                 name="CQLSH",
@@ -178,6 +178,13 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
                 name=entrypoint_configmap_name, default_mode=int("0777", 8)
             ),  # 0777 permission in octal as int
         )
+       cassandra_ssl_volume = client.V1Volume(
+            name="cassandra-crt",
+            secret=client.V1SecretVolumeSource(
+                secret_name="uptime-service-cassandra-crt"
+            ),
+        )
+
 
         # Define the volumeMounts
         auth_volume_mount = client.V1VolumeMount(
@@ -188,6 +195,10 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
         entrypoint_volume_mount = client.V1VolumeMount(
             name="entrypoint-volume",
             mount_path="/bin/entrypoint",
+        )
+        cassandra_ssl_volume_mount = client.V1VolumeMount(
+            name="cassandra-crt",
+            mount_path="/certs",
         )
 
         # Define resources for app and init container
@@ -209,6 +220,7 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
             volume_mounts=[
                 auth_volume_mount,
                 entrypoint_volume_mount,
+                cassandra_ssl_volume_mount,
             ],
         )
 
@@ -224,7 +236,7 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
                         containers=[container],
                         restart_policy="Never",
                         service_account_name=service_account_name,
-                        volumes=[auth_volume, entrypoint_volume],
+                        volumes=[auth_volume, entrypoint_volume, cassandra_ssl_volume],
                     )
                 ),
             ),
