@@ -66,8 +66,8 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
 
     ttl_seconds = int(os.environ.get("WORKER_TTL_SECONDS_AFTER_FINISHED"))
 
-    # List to keep track of job names
-    jobs = []
+    # List to keep track of job names and retry counts
+    jobs = {}
     cassandra_ip = try_get_hostname_ip(Config.CASSANDRA_HOST, logging)
     if Config.no_checks():
         logging.info("stateless-verifier will run with --no-checks flag")
@@ -260,21 +260,34 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
             logging.info(
                 f"Job {job_name} created in namespace {namespace}; start: {datetime_formatter(mini_batch[0])}, end: {datetime_formatter(mini_batch[1])}."
             )
-            jobs.append(job_name)
+            jobs[job_name] = {"attempts": 0}
         except Exception as e:
             logging.error(f"Error creating job {job_name}: {e}")
 
     # Monitor jobs
     while jobs:
-        for job_name in list(jobs):
+        for job_name in list(jobs.keys()):
             try:
                 job_status = api_batch.read_namespaced_job_status(job_name, namespace)
                 if job_status.status.succeeded:
                     logging.info(f"Job {job_name} succeeded.")
-                    jobs.remove(job_name)
+                    del jobs[job_name]
                 elif job_status.status.failed:
-                    logging.error(f"Job {job_name} failed.")
-                    jobs.remove(job_name)
+                    if jobs[job_name]["attempts"] < Config.RETRY_COUNT:
+                        logging.error(
+                            f"Job {job_name} failed. Attempting to restart ({jobs[job_name]['attempts'] + 1}/{Config.RETRY_COUNT})."
+                        )
+                        api_batch.delete_namespaced_job(
+                            job_name, namespace, propagation_policy="Background"
+                        )
+                        time.sleep(5)
+                        jobs[job_name]["attempts"] += 1
+                        api_batch.create_namespaced_job(namespace, job)
+                    else:
+                        logging.error(
+                            f"Job {job_name} failed after {Config.RETRY_COUNT} attempts."
+                        )
+                        del jobs[job_name]
             except Exception as e:
                 logging.error(f"Error reading job status for {job_name}: {e}")
 
