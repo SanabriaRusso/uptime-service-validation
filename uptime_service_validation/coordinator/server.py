@@ -269,12 +269,17 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
         for job_name in list(jobs):
             try:
                 job_status = api_batch.read_namespaced_job_status(job_name, namespace)
-                if job_status.status.succeeded:
-                    logging.info(f"Job {job_name} succeeded.")
-                    jobs.remove(job_name)
-                elif job_status.status.failed:
-                    logging.error(f"Job {job_name} failed.")
-                    jobs.remove(job_name)
+                conditions = job_status.status.conditions
+                if conditions:
+                    for condition in conditions:
+                        if condition.type == "Failed" and condition.status == "True":
+                            logging.error(f"Job {job_name} failed: {condition.message}")
+                            jobs.remove(job_name)
+                        elif (
+                            condition.type == "Complete" and condition.status == "True"
+                        ):
+                            logging.info(f"Job {job_name} succeeded.")
+                            jobs.remove(job_name)
             except Exception as e:
                 logging.error(f"Error reading job status for {job_name}: {e}")
 
