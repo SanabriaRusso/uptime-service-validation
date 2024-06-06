@@ -275,6 +275,8 @@ def setUpValidatorPods(time_intervals, logging, worker_image, worker_tag):
                         if condition.type == "Failed" and condition.status == "True":
                             logging.error(f"Job {job_name} failed: {condition.message}")
                             jobs.remove(job_name)
+                            logging.fatal("Exiting due to job failure.")
+                            exit(1)
                         elif (
                             condition.type == "Complete" and condition.status == "True"
                         ):
